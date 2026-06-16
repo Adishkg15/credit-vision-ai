@@ -1,7 +1,5 @@
 import { createFileRoute, useNavigate, Link, redirect } from "@tanstack/react-router";
-import { z } from "zod";
 import { useState, useEffect } from "react";
-import { zodValidator } from "@tanstack/zod-adapter";
 import { Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,10 +7,12 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 
-const searchSchema = z.object({ mode: z.enum(["signin", "signup"]).optional() });
+type AuthSearch = { mode?: "signin" | "signup" };
 
 export const Route = createFileRoute("/auth")({
-  validateSearch: zodValidator(searchSchema),
+  validateSearch: (s: Record<string, unknown>): AuthSearch => ({
+    mode: s.mode === "signup" ? "signup" : s.mode === "signin" ? "signin" : undefined,
+  }),
   head: () => ({ meta: [{ title: "Sign in — CreditVision AI" }] }),
   beforeLoad: async () => {
     if (typeof window === "undefined") return;
