@@ -204,10 +204,25 @@ function ApplicantView({ r, data, radarData, barData }: {
         </div>
       </div>
 
+      {/* Explainable AI */}
+      <div className="mt-6">
+        <ExplainableAI r={r} />
+      </div>
+
+      {/* Confidence analysis */}
+      <div className="mt-6">
+        <ConfidenceAnalysis inputs={data.inputs} result={r} />
+      </div>
+
+      {/* What-if simulator */}
+      <div className="mt-6">
+        <WhatIfSimulator inputs={data.inputs} baseline={r} />
+      </div>
+
       <p className="mt-8 text-center text-xs text-muted-foreground">
         This report is generated from inputs you provided. CreditVision AI evaluates capacity and behaviour, not credit history.
       </p>
-    </div>
+    </>
   );
 }
 
