@@ -6,8 +6,14 @@ import {
   Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer,
   BarChart, Bar, XAxis, YAxis, Tooltip, Cell,
 } from "recharts";
-import { CheckCircle2, AlertTriangle, Info, ArrowLeft, ShieldCheck, Activity, Sparkles } from "lucide-react";
+import { CheckCircle2, AlertTriangle, Info, ArrowLeft, ShieldCheck, Activity, Sparkles, Download, Users, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useState } from "react";
+import { ExplainableAI } from "@/components/report/ExplainableAI";
+import { ConfidenceAnalysis } from "@/components/report/ConfidenceAnalysis";
+import { WhatIfSimulator } from "@/components/report/WhatIfSimulator";
+import { LenderView } from "@/components/report/LenderView";
+import { downloadPdfReport } from "@/lib/pdf-report";
 
 type AssessmentRow = {
   id: string; created_at: string; applicant_name: string | null;
