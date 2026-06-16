@@ -37,15 +37,26 @@ function AuthPage() {
     setLoading(true);
     try {
       if (tab === "signup") {
-        const { error } = await supabase.auth.signUp({
+        const { data, error } = await supabase.auth.signUp({
           email, password,
           options: { emailRedirectTo: `${window.location.origin}/dashboard` },
         });
         if (error) throw error;
+        if (!data.session) {
+          toast.success("Account created. Check your inbox to verify your email, then sign in.");
+          setTab("signin");
+          return;
+        }
         toast.success("Account created. Signing you in…");
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw error;
+        if (error) {
+          if ((error as { code?: string }).code === "email_not_confirmed") {
+            toast.error("Please verify your email first. Check your inbox for the confirmation link.");
+            return;
+          }
+          throw error;
+        }
         toast.success("Welcome back.");
       }
       navigate({ to: "/dashboard" });
