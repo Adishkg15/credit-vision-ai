@@ -6,8 +6,14 @@ import {
   Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer,
   BarChart, Bar, XAxis, YAxis, Tooltip, Cell,
 } from "recharts";
-import { CheckCircle2, AlertTriangle, Info, ArrowLeft, ShieldCheck, Activity, Sparkles } from "lucide-react";
+import { CheckCircle2, AlertTriangle, Info, ArrowLeft, ShieldCheck, Activity, Sparkles, Download, Users, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useState } from "react";
+import { ExplainableAI } from "@/components/report/ExplainableAI";
+import { ConfidenceAnalysis } from "@/components/report/ConfidenceAnalysis";
+import { WhatIfSimulator } from "@/components/report/WhatIfSimulator";
+import { LenderView } from "@/components/report/LenderView";
+import { downloadPdfReport } from "@/lib/pdf-report";
 
 type AssessmentRow = {
   id: string; created_at: string; applicant_name: string | null;
@@ -43,16 +49,53 @@ function ReportPage() {
 
   const radarData = r.categories.map(c => ({ subject: c.label, A: c.score, fullMark: 100 }));
   const barData = r.categories.map(c => ({ name: c.label, score: c.score, confidence: c.confidence }));
+  const [view, setView] = useState<"applicant" | "lender">("applicant");
+  const applicantName = data.applicant_name || data.inputs.name || "Applicant";
+
+  const handlePdf = () => {
+    downloadPdfReport({ applicantName, inputs: data.inputs, result: r });
+  };
 
   return (
     <div className="mx-auto max-w-7xl px-6 py-10">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Link to="/dashboard"><Button variant="ghost" size="sm"><ArrowLeft className="mr-1 h-4 w-4" /> Dashboard</Button></Link>
-        <div className="text-xs text-muted-foreground">
-          Generated {new Date(data.created_at).toLocaleString()}
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="inline-flex rounded-lg border border-border bg-surface-2/60 p-1 text-xs">
+            <button
+              onClick={() => setView("applicant")}
+              className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 transition-colors cursor-pointer ${view === "applicant" ? "bg-primary text-primary-foreground font-semibold" : "text-muted-foreground hover:text-foreground"}`}>
+              <User className="h-3.5 w-3.5" /> Applicant View
+            </button>
+            <button
+              onClick={() => setView("lender")}
+              className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 transition-colors cursor-pointer ${view === "lender" ? "bg-primary text-primary-foreground font-semibold" : "text-muted-foreground hover:text-foreground"}`}>
+              <Users className="h-3.5 w-3.5" /> Lender View
+            </button>
+          </div>
+          <Button size="sm" onClick={handlePdf}><Download className="mr-1 h-4 w-4" /> Export PDF</Button>
+          <div className="text-xs text-muted-foreground">Generated {new Date(data.created_at).toLocaleString()}</div>
         </div>
       </div>
 
+      {view === "lender" ? (
+        <div className="mt-6">
+          <LenderView applicant={applicantName} inputs={data.inputs} result={r} />
+        </div>
+      ) : (
+        <ApplicantView r={r} data={data} radarData={radarData} barData={barData} />
+      )}
+    </div>
+  );
+}
+
+function ApplicantView({ r, data, radarData, barData }: {
+  r: AssessmentResult; data: AssessmentRow;
+  radarData: { subject: string; A: number; fullMark: number }[];
+  barData: { name: string; score: number; confidence: number }[];
+}) {
+  return (
+    <>
       {/* Hero */}
       <div className="mt-6 card-elevated overflow-hidden">
         <div className="relative grid gap-6 p-8 md:grid-cols-3">
@@ -161,10 +204,25 @@ function ReportPage() {
         </div>
       </div>
 
+      {/* Explainable AI */}
+      <div className="mt-6">
+        <ExplainableAI r={r} />
+      </div>
+
+      {/* Confidence analysis */}
+      <div className="mt-6">
+        <ConfidenceAnalysis inputs={data.inputs} result={r} />
+      </div>
+
+      {/* What-if simulator */}
+      <div className="mt-6">
+        <WhatIfSimulator inputs={data.inputs} baseline={r} />
+      </div>
+
       <p className="mt-8 text-center text-xs text-muted-foreground">
         This report is generated from inputs you provided. CreditVision AI evaluates capacity and behaviour, not credit history.
       </p>
-    </div>
+    </>
   );
 }
 
