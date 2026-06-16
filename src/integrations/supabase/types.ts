@@ -14,7 +14,51 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      assessments: {
+        Row: {
+          applicant_name: string | null
+          confidence_score: number | null
+          created_at: string
+          eligibility_status: string | null
+          id: string
+          inputs: Json
+          overall_score: number | null
+          result: Json
+          risk_level: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          applicant_name?: string | null
+          confidence_score?: number | null
+          created_at?: string
+          eligibility_status?: string | null
+          id?: string
+          inputs: Json
+          overall_score?: number | null
+          result: Json
+          risk_level?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          applicant_name?: string | null
+          confidence_score?: number | null
+          created_at?: string
+          eligibility_status?: string | null
+          id?: string
+          inputs?: Json
+          overall_score?: number | null
+          result?: Json
+          risk_level?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
