@@ -13,6 +13,8 @@ import { ExplainableAI } from "@/components/report/ExplainableAI";
 import { ConfidenceAnalysis } from "@/components/report/ConfidenceAnalysis";
 import { WhatIfSimulator } from "@/components/report/WhatIfSimulator";
 import { LenderView } from "@/components/report/LenderView";
+import { AdvancedScores } from "@/components/report/AdvancedScores";
+import { AIInsights } from "@/components/report/AIInsights";
 import { downloadPdfReport } from "@/lib/pdf-report";
 
 type AssessmentRow = {
@@ -202,6 +204,16 @@ function ApplicantView({ r, data, radarData, barData }: {
         <div className="mt-4 grid gap-4 md:grid-cols-2">
           {r.recommendations.map(rec => <RecCard key={rec.product} rec={rec} />)}
         </div>
+      </div>
+
+      {/* Advanced scores (Future Potential, Financial Discipline, Trust) */}
+      <div className="mt-6">
+        <AdvancedScores r={r} />
+      </div>
+
+      {/* AI insights */}
+      <div className="mt-6">
+        <AIInsights inputs={data.inputs} result={r} />
       </div>
 
       {/* Explainable AI */}
