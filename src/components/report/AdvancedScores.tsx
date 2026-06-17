@@ -3,6 +3,7 @@ import type { AssessmentResult } from "@/lib/scoring";
 
 export function AdvancedScores({ r }: { r: AssessmentResult }) {
   const a = r.advanced;
+  if (!a) return null;
   return (
     <div className="card-elevated p-6">
       <div>
