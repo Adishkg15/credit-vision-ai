@@ -82,9 +82,17 @@ function ReportPage() {
       </div>
 
       {view === "lender" ? (
-        <div className="mt-6">
-          <LenderView applicant={applicantName} inputs={data.inputs} result={r} />
-        </div>
+        <>
+          <div className="mt-6">
+            <LenderView applicant={applicantName} inputs={data.inputs} result={r} />
+          </div>
+          <div className="mt-6">
+            <BankStatementAnalyzer
+              declaredIncome={data.inputs.monthlyIncome ?? 0}
+              baseConfidence={r.confidenceScore}
+            />
+          </div>
+        </>
       ) : (
         <ApplicantView r={r} data={data} radarData={radarData} barData={barData} />
       )}
