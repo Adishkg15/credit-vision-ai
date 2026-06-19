@@ -249,13 +249,6 @@ function ApplicantView({ r, data, radarData, barData }: {
         <WhatIfSimulator inputs={data.inputs} baseline={r} />
       </div>
 
-      {/* Bank statement analyser (optional upload) */}
-      <div className="mt-6">
-        <BankStatementAnalyzer
-          declaredIncome={data.inputs.monthlyIncome ?? 0}
-          baseConfidence={r.confidenceScore}
-        />
-      </div>
 
       <p className="mt-8 text-center text-xs text-muted-foreground">
         This report is generated from inputs you provided. CreditVision AI evaluates capacity and behaviour, not credit history.
