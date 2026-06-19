@@ -82,9 +82,17 @@ function ReportPage() {
       </div>
 
       {view === "lender" ? (
-        <div className="mt-6">
-          <LenderView applicant={applicantName} inputs={data.inputs} result={r} />
-        </div>
+        <>
+          <div className="mt-6">
+            <LenderView applicant={applicantName} inputs={data.inputs} result={r} />
+          </div>
+          <div className="mt-6">
+            <BankStatementAnalyzer
+              declaredIncome={data.inputs.monthlyIncome ?? 0}
+              baseConfidence={r.confidenceScore}
+            />
+          </div>
+        </>
       ) : (
         <ApplicantView r={r} data={data} radarData={radarData} barData={barData} />
       )}
@@ -120,6 +128,15 @@ function ApplicantView({ r, data, radarData, barData }: {
           </div>
         </div>
       </div>
+
+      {/* Bank statement analyser (optional upload) — surfaced early so users can verify */}
+      <div className="mt-6">
+        <BankStatementAnalyzer
+          declaredIncome={data.inputs.monthlyIncome ?? 0}
+          baseConfidence={r.confidenceScore}
+        />
+      </div>
+
 
       {/* Meters */}
       <div className="mt-6 grid gap-4 md:grid-cols-2">
@@ -232,13 +249,6 @@ function ApplicantView({ r, data, radarData, barData }: {
         <WhatIfSimulator inputs={data.inputs} baseline={r} />
       </div>
 
-      {/* Bank statement analyser (optional upload) */}
-      <div className="mt-6">
-        <BankStatementAnalyzer
-          declaredIncome={data.inputs.monthlyIncome ?? 0}
-          baseConfidence={r.confidenceScore}
-        />
-      </div>
 
       <p className="mt-8 text-center text-xs text-muted-foreground">
         This report is generated from inputs you provided. CreditVision AI evaluates capacity and behaviour, not credit history.
