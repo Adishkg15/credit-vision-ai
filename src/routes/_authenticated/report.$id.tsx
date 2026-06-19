@@ -15,6 +15,7 @@ import { WhatIfSimulator } from "@/components/report/WhatIfSimulator";
 import { LenderView } from "@/components/report/LenderView";
 import { AdvancedScores } from "@/components/report/AdvancedScores";
 import { AIInsights } from "@/components/report/AIInsights";
+import { BankStatementAnalyzer } from "@/components/report/BankStatementAnalyzer";
 import { downloadPdfReport } from "@/lib/pdf-report";
 
 type AssessmentRow = {
@@ -229,6 +230,14 @@ function ApplicantView({ r, data, radarData, barData }: {
       {/* What-if simulator */}
       <div className="mt-6">
         <WhatIfSimulator inputs={data.inputs} baseline={r} />
+      </div>
+
+      {/* Bank statement analyser (optional upload) */}
+      <div className="mt-6">
+        <BankStatementAnalyzer
+          declaredIncome={data.inputs.monthlyIncome ?? 0}
+          baseConfidence={r.confidenceScore}
+        />
       </div>
 
       <p className="mt-8 text-center text-xs text-muted-foreground">
