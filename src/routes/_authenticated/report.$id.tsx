@@ -129,6 +129,15 @@ function ApplicantView({ r, data, radarData, barData }: {
         </div>
       </div>
 
+      {/* Bank statement analyser (optional upload) — surfaced early so users can verify */}
+      <div className="mt-6">
+        <BankStatementAnalyzer
+          declaredIncome={data.inputs.monthlyIncome ?? 0}
+          baseConfidence={r.confidenceScore}
+        />
+      </div>
+
+
       {/* Meters */}
       <div className="mt-6 grid gap-4 md:grid-cols-2">
         <Meter title="Risk meter" value={100 - r.overallScore} suffix="risk index"
