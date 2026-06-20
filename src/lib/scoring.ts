@@ -2,6 +2,8 @@
 // Philosophy: missing credit history = missing information, NOT risk.
 // Risk score and Confidence score are independent.
 
+import type { BankAnalysis } from "./bank-statement";
+
 export type EmploymentType =
   | "student"
   | "fresher"
@@ -65,6 +67,9 @@ export interface AssessmentInputs {
   salaryGrowthPct: number;
   promotions: number;
   employerStability: 1 | 2 | 3 | 4 | 5;
+
+  // Step 6 — Bank Verification (optional)
+  bankAnalysis?: BankAnalysis | null;
 }
 
 export interface CategoryBreakdown {
@@ -95,6 +100,20 @@ export interface AdvancedScores {
   trustBreakdown: { label: string; contribution: number }[];
 }
 
+export type VerificationStatus = "Verified" | "Partially Verified" | "Self Reported";
+
+export interface VerificationSummary {
+  status: VerificationStatus;
+  verificationScore: number;       // 0..100
+  bankingHealthScore: number;      // 0..100
+  incomeMatchPct: number;          // 0..100 (100 = no match data)
+  declaredIncome: number;
+  verifiedIncome: number;
+  statementPeriod: string;         // "Jan 24 → Jun 24" or "Not provided"
+  hasBankStatement: boolean;
+  incomeMismatchFlag: boolean;     // declared vs verified differ >20%
+}
+
 export interface AssessmentResult {
   overallScore: number;
   confidenceScore: number;
@@ -107,6 +126,7 @@ export interface AssessmentResult {
   insights: string[];
   recommendations: LoanRecommendation[];
   advanced: AdvancedScores;
+  verification: VerificationSummary;
 }
 
 const clamp = (n: number, lo = 0, hi = 100) => Math.max(lo, Math.min(hi, n));
@@ -291,8 +311,67 @@ export function computeAssessment(i: AssessmentInputs): AssessmentResult {
     { key: "bills",      label: "Bill Payment Consistency",  weight: 10, score: round(billConsistency), confidence: billConsConf, notes: [] },
   ];
 
+  // ---------- Bank Statement Verification boosts (never increase risk) ----------
+  const ba = i.bankAnalysis ?? null;
+  if (ba) {
+    // Banking behaviour: blend with bankingHealthScore (weighted toward higher)
+    const bankIdx = categories.findIndex(c => c.key === "banking");
+    if (bankIdx >= 0) {
+      const cur = categories[bankIdx].score;
+      const blended = round(Math.max(cur, cur * 0.5 + ba.bankingHealthScore * 0.5));
+      categories[bankIdx] = { ...categories[bankIdx], score: blended, confidence: Math.min(98, categories[bankIdx].confidence + 8) };
+    }
+    // Financial Stability: small boost if savings + cash flow strong
+    if (ba.savingsBehaviour >= 60 || ba.cashFlowStability >= 60) {
+      const finIdx = categories.findIndex(c => c.key === "financial");
+      if (finIdx >= 0) {
+        const cur = categories[finIdx].score;
+        const bump = Math.round((ba.savingsBehaviour + ba.cashFlowStability) / 2 * 0.08);
+        categories[finIdx] = { ...categories[finIdx], score: clamp(cur + bump), confidence: Math.min(98, categories[finIdx].confidence + 6) };
+      }
+    }
+  }
+
   const overallScore = round(categories.reduce((s, c) => s + c.score * (c.weight / 100), 0));
-  const confidenceScore = round(categories.reduce((s, c) => s + c.confidence * (c.weight / 100), 0));
+  let confidenceScore = round(categories.reduce((s, c) => s + c.confidence * (c.weight / 100), 0));
+  if (ba) confidenceScore = clamp(confidenceScore + ba.confidenceAdjustment);
+
+  // ---------- Verification Summary ----------
+  const declared = Math.max(0, i.monthlyIncome || 0);
+  let verification: VerificationSummary;
+  if (ba) {
+    const status: VerificationStatus =
+      (ba.matchQuality >= 80 && ba.verificationScore >= 60) ? "Verified"
+        : "Partially Verified";
+    const mismatchFlag = declared > 0 && ba.verifiedIncome > 0
+      && Math.abs(declared - ba.verifiedIncome) / Math.max(declared, ba.verifiedIncome) > 0.2;
+    verification = {
+      status,
+      verificationScore: ba.verificationScore,
+      bankingHealthScore: ba.bankingHealthScore,
+      incomeMatchPct: ba.matchQuality,
+      declaredIncome: declared,
+      verifiedIncome: ba.verifiedIncome,
+      statementPeriod: `${ba.dateRange.from} → ${ba.dateRange.to}`,
+      hasBankStatement: true,
+      incomeMismatchFlag: mismatchFlag,
+    };
+    if (mismatchFlag) concerns.push(`Declared income differs from verified bank income by >20%.`);
+    if (status === "Verified") strengths.push("Bank statement verified income and behaviour.");
+  } else {
+    verification = {
+      status: "Self Reported",
+      verificationScore: 0,
+      bankingHealthScore: 0,
+      incomeMatchPct: 0,
+      declaredIncome: declared,
+      verifiedIncome: 0,
+      statementPeriod: "Not provided",
+      hasBankStatement: false,
+      incomeMismatchFlag: false,
+    };
+    missing.push("Bank statement (would raise verification & confidence)");
+  }
 
   // ---------- Risk + Eligibility ----------
   let riskLevel: AssessmentResult["riskLevel"];
@@ -424,6 +503,7 @@ export function computeAssessment(i: AssessmentInputs): AssessmentResult {
     insights: insights.slice(0, 6),
     recommendations,
     advanced,
+    verification,
   };
 }
 

@@ -1,15 +1,16 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useSuspenseQuery, queryOptions } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import type { AssessmentResult, AssessmentInputs, LoanRecommendation } from "@/lib/scoring";
+import type { AssessmentResult, AssessmentInputs, LoanRecommendation, VerificationStatus } from "@/lib/scoring";
 import {
   Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer,
-  BarChart, Bar, XAxis, YAxis, Tooltip, Cell,
 } from "recharts";
-import { ArrowLeft, ShieldCheck, Activity, Sparkles, Download, Users, User, ChevronDown, LayoutDashboard, Wallet, FileCheck2, BrainCircuit, PlayCircle } from "lucide-react";
+import {
+  ArrowLeft, ShieldCheck, Download, ChevronDown, FileCheck2, AlertTriangle,
+  CheckCircle2, Sparkles, Wallet, CreditCard, TrendingUp,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ExplainableAI } from "@/components/report/ExplainableAI";
 import { ConfidenceAnalysis } from "@/components/report/ConfidenceAnalysis";
@@ -51,61 +52,74 @@ function ReportPage() {
   const { id } = Route.useParams();
   const { data } = useSuspenseQuery(opts(id));
   const r = data.result;
-  const [view, setView] = useState<"applicant" | "lender">("applicant");
   const applicantName = data.applicant_name || data.inputs.name || "Applicant";
-
   const handlePdf = () => downloadPdfReport({ applicantName, inputs: data.inputs, result: r });
+
+  // Defensive: older assessments may not have `verification`.
+  const verification = r.verification ?? {
+    status: "Self Reported" as VerificationStatus,
+    verificationScore: 0, bankingHealthScore: 0, incomeMatchPct: 0,
+    declaredIncome: data.inputs.monthlyIncome ?? 0, verifiedIncome: 0,
+    statementPeriod: "Not provided", hasBankStatement: false, incomeMismatchFlag: false,
+  };
 
   return (
     <div className="mx-auto max-w-6xl px-6 py-10">
-      {/* Top bar */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Link to="/dashboard"><Button variant="ghost" size="sm"><ArrowLeft className="mr-1 h-4 w-4" /> Dashboard</Button></Link>
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="inline-flex rounded-lg border border-border bg-surface-2/60 p-1 text-xs">
-            <button
-              onClick={() => setView("applicant")}
-              className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 transition-colors cursor-pointer ${view === "applicant" ? "bg-primary text-primary-foreground font-semibold" : "text-muted-foreground hover:text-foreground"}`}>
-              <User className="h-3.5 w-3.5" /> Applicant
-            </button>
-            <button
-              onClick={() => setView("lender")}
-              className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 transition-colors cursor-pointer ${view === "lender" ? "bg-primary text-primary-foreground font-semibold" : "text-muted-foreground hover:text-foreground"}`}>
-              <Users className="h-3.5 w-3.5" /> Lender
-            </button>
-          </div>
-          <Button size="sm" onClick={handlePdf}><Download className="mr-1 h-4 w-4" /> Export PDF</Button>
-        </div>
+        <Button size="sm" onClick={handlePdf}><Download className="mr-1 h-4 w-4" /> Export PDF</Button>
       </div>
 
-      {/* Executive Summary — always visible, both views */}
-      <ExecutiveSummary applicantName={applicantName} r={r} createdAt={data.created_at} />
+      {/* SECTION 1 — Executive Summary */}
+      <ExecutiveSummary applicantName={applicantName} r={r} verificationStatus={verification.status} createdAt={data.created_at} />
 
-      {view === "lender" ? (
-        <LenderModeBody r={r} inputs={data.inputs} applicantName={applicantName} />
-      ) : (
-        <ApplicantTabs r={r} data={data} />
+      {/* Mismatch warning */}
+      {verification.incomeMismatchFlag && (
+        <div className="mt-4 flex items-start gap-3 rounded-xl border border-warning/40 bg-warning/10 p-4 text-sm text-warning">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+          <div>
+            <p className="font-semibold">Income mismatch flag</p>
+            <p className="mt-1 text-xs">
+              Declared monthly income (₹{verification.declaredIncome.toLocaleString("en-IN")}) differs from verified bank income
+              (₹{verification.verifiedIncome.toLocaleString("en-IN")}) by more than 20%. Recommend manual review.
+            </p>
+          </div>
+        </div>
       )}
 
+      {/* SECTION 2 — Key Metrics */}
+      <KeyMetrics r={r} />
+
+      {/* SECTION 3 — Radar */}
+      <ScoreBreakdownRadar r={r} />
+
+      {/* SECTION 4 — Recommendations */}
+      <Recommendations r={r} />
+
+      {/* SECTION 5 — AI Insights */}
+      <div className="mt-8">
+        <AIInsights inputs={data.inputs} result={r} />
+      </div>
+
+      {/* SECTION 6 — Verification Summary */}
+      <VerificationSummaryCard v={verification} />
+
+      {/* Advanced Analysis accordion */}
+      <AdvancedAnalysis r={r} inputs={data.inputs} applicantName={applicantName} />
+
       <p className="mt-10 text-center text-xs text-muted-foreground">
-        Generated from inputs you provided. Risk and confidence are independent.
+        Generated from inputs you provided. Risk and confidence are independent. Missing data lowers confidence, never risk.
       </p>
     </div>
   );
 }
 
-/* ============================================================
-   Executive Summary — the single premium card at the top
-   ============================================================ */
-function ExecutiveSummary({ applicantName, r, createdAt }: {
-  applicantName: string; r: AssessmentResult; createdAt: string;
+/* ====================================================
+   SECTION 1 — Executive Summary
+   ==================================================== */
+function ExecutiveSummary({ applicantName, r, verificationStatus, createdAt }: {
+  applicantName: string; r: AssessmentResult; verificationStatus: VerificationStatus; createdAt: string;
 }) {
-  const recommendation =
-    r.eligibilityStatus === "Approved" ? "Approve"
-    : r.eligibilityStatus === "Conditional Approval" ? "Approve with conditions"
-    : r.eligibilityStatus === "Manual Review" ? "Refer for manual review"
-    : "Decline at this time";
-
   return (
     <div className="mt-6 card-elevated overflow-hidden">
       <div className="relative grid gap-8 p-8 md:grid-cols-[1fr_auto] md:p-10">
@@ -119,7 +133,7 @@ function ExecutiveSummary({ applicantName, r, createdAt }: {
             <Stat label="Risk Level" value={r.riskLevel} tone={riskTone(r.riskLevel)} />
             <Stat label="Eligibility" value={r.eligibilityStatus} tone={eligTone(r.eligibilityStatus)} />
             <Stat label="Confidence" value={`${Math.round(r.confidenceScore)}%`} />
-            <Stat label="Recommendation" value={recommendation} tone={eligTone(r.eligibilityStatus)} />
+            <Stat label="Verification" value={verificationStatus} tone={verifTone(verificationStatus)} />
           </div>
         </div>
         <div className="relative grid place-items-center">
@@ -145,195 +159,243 @@ function Stat({ label, value, tone }: { label: string; value: string; tone?: "su
   );
 }
 
-/* ============================================================
-   Applicant view — tabbed information architecture
-   ============================================================ */
-function ApplicantTabs({ r, data }: { r: AssessmentResult; data: AssessmentRow }) {
-  const radarData = r.categories.map(c => ({ subject: c.label, A: c.score, fullMark: 100 }));
-  const barData = r.categories.map(c => ({ name: c.label, score: c.score }));
-
+/* ====================================================
+   SECTION 2 — Key Metrics (4 cards only)
+   ==================================================== */
+function KeyMetrics({ r }: { r: AssessmentResult }) {
+  const wanted = ["financial", "banking", "employment", "bills"];
+  const cats = wanted
+    .map(k => r.categories.find(c => c.key === k))
+    .filter((c): c is NonNullable<typeof c> => !!c);
   return (
-    <Tabs defaultValue="overview" className="mt-8">
-      <TabsList className="grid h-auto w-full grid-cols-2 gap-1 bg-surface-2/60 p-1 md:inline-flex md:w-auto">
-        <TabsTrigger value="overview" className="gap-1.5"><LayoutDashboard className="h-3.5 w-3.5" /> Overview</TabsTrigger>
-        <TabsTrigger value="recommendations" className="gap-1.5"><Wallet className="h-3.5 w-3.5" /> Recommendations</TabsTrigger>
-        <TabsTrigger value="verification" className="gap-1.5"><FileCheck2 className="h-3.5 w-3.5" /> Verification</TabsTrigger>
-        <TabsTrigger value="insights" className="gap-1.5"><BrainCircuit className="h-3.5 w-3.5" /> AI Insights</TabsTrigger>
-      </TabsList>
-
-      {/* OVERVIEW */}
-      <TabsContent value="overview" className="mt-6 space-y-6">
-        <div className="grid gap-4 lg:grid-cols-5">
-          <div className="card-elevated p-6 lg:col-span-2">
-            <h2 className="font-display text-base font-semibold">Category radar</h2>
-            <p className="text-xs text-muted-foreground">Six-factor breakdown</p>
-            <div className="mt-3 h-72">
-              <ResponsiveContainer>
-                <RadarChart data={radarData}>
-                  <PolarGrid stroke="oklch(0.35 0.02 260)" />
-                  <PolarAngleAxis dataKey="subject" tick={{ fill: "oklch(0.78 0.02 255)", fontSize: 11 }} />
-                  <PolarRadiusAxis angle={30} domain={[0, 100]} tick={{ fill: "oklch(0.6 0.02 255)", fontSize: 10 }} />
-                  <Radar dataKey="A" stroke="oklch(0.78 0.16 180)" fill="oklch(0.78 0.16 180)" fillOpacity={0.35} />
-                </RadarChart>
-              </ResponsiveContainer>
-            </div>
+    <div className="mt-8 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      {cats.map(c => (
+        <div key={c.key} className="card-elevated p-5">
+          <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">{c.label}</p>
+          <p className="mt-2 font-display text-3xl font-semibold text-gradient">{Math.round(c.score)}</p>
+          <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-surface-2">
+            <div className="h-full rounded-full bg-[image:var(--gradient-brand)]" style={{ width: `${c.score}%` }} />
           </div>
-
-          <div className="card-elevated p-6 lg:col-span-3">
-            <h2 className="font-display text-base font-semibold">Score distribution</h2>
-            <p className="text-xs text-muted-foreground">Per category, out of 100</p>
-            <div className="mt-3 h-72">
-              <ResponsiveContainer>
-                <BarChart data={barData} layout="vertical" margin={{ left: 20, right: 16 }}>
-                  <XAxis type="number" domain={[0, 100]} tick={{ fill: "oklch(0.6 0.02 255)", fontSize: 11 }} />
-                  <YAxis type="category" dataKey="name" width={160} tick={{ fill: "oklch(0.85 0.02 255)", fontSize: 11 }} />
-                  <Tooltip cursor={{ fill: "oklch(0.28 0.02 260 / 0.5)" }} contentStyle={{ background: "oklch(0.20 0.02 260)", border: "1px solid oklch(0.30 0.02 260)", borderRadius: 8, color: "oklch(0.95 0 0)" }} />
-                  <Bar dataKey="score" name="Score" radius={[0, 6, 6, 0]}>
-                    {barData.map((_, i) => <Cell key={i} fill="oklch(0.78 0.16 180)" />)}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
+          <p className="mt-2 text-[10px] uppercase tracking-widest text-muted-foreground">Confidence {Math.round(c.confidence)}%</p>
         </div>
-
-        <div className="grid gap-4 md:grid-cols-2">
-          <Meter title="Risk index" value={100 - r.overallScore} suffix="/ 100"
-            icon={<ShieldCheck className="h-4 w-4" />}
-            subtitle="Lower is better. Independent of confidence." tone="risk" />
-          <Meter title="Confidence" value={r.confidenceScore} suffix="%"
-            icon={<Activity className="h-4 w-4" />}
-            subtitle="Data sufficiency. Missing data lowers this — not your score." tone="confidence" />
-        </div>
-
-        <AdvancedScores r={r} />
-
-        {/* Collapsible advanced analytics */}
-        <Section title="Explainable AI" subtitle="Factor-by-factor reasoning">
-          <ExplainableAI r={r} />
-        </Section>
-        <Section title="Confidence Analysis" subtitle="What we have and what's missing">
-          <ConfidenceAnalysis inputs={data.inputs} result={r} />
-        </Section>
-      </TabsContent>
-
-      {/* RECOMMENDATIONS */}
-      <TabsContent value="recommendations" className="mt-6 space-y-6">
-        <div className="card-elevated p-6">
-          <h2 className="font-display text-lg font-semibold">Lending recommendations</h2>
-          <p className="text-xs text-muted-foreground">Derived from your inputs — never hard-coded.</p>
-          <div className="mt-5 grid gap-4 md:grid-cols-2">
-            {r.recommendations.map(rec => <RecCard key={rec.product} rec={rec} />)}
-          </div>
-        </div>
-
-        <SimulatorPanel inputs={data.inputs} baseline={r} />
-      </TabsContent>
-
-      {/* VERIFICATION */}
-      <TabsContent value="verification" className="mt-6">
-        <BankStatementAnalyzer
-          declaredIncome={data.inputs.monthlyIncome ?? 0}
-          baseConfidence={r.confidenceScore}
-        />
-      </TabsContent>
-
-      {/* AI INSIGHTS */}
-      <TabsContent value="insights" className="mt-6">
-        <AIAssessmentSummary inputs={data.inputs} result={r} />
-      </TabsContent>
-    </Tabs>
+      ))}
+    </div>
   );
 }
 
-/* ============================================================
-   Lender view body — minimal, decision-grade
-   ============================================================ */
-function LenderModeBody({ r, inputs, applicantName }: {
+/* ====================================================
+   SECTION 3 — Radar Chart with wrapped labels
+   ==================================================== */
+function ScoreBreakdownRadar({ r }: { r: AssessmentResult }) {
+  const radarData = r.categories.map(c => ({ subject: c.label, A: c.score, fullMark: 100 }));
+  return (
+    <div className="mt-8 card-elevated p-6 md:p-8">
+      <h2 className="font-display text-lg font-semibold">Score breakdown</h2>
+      <p className="text-xs text-muted-foreground">Six-factor view of your credit profile.</p>
+      {/* Generous height and outerRadius gives wrapped labels room on all screens */}
+      <div className="mt-6 h-[420px] w-full px-2 md:h-[480px] md:px-8">
+        <ResponsiveContainer>
+          <RadarChart data={radarData} margin={{ top: 30, right: 70, bottom: 30, left: 70 }} outerRadius="72%">
+            <PolarGrid stroke="oklch(0.35 0.02 260)" />
+            <PolarAngleAxis dataKey="subject" tick={<WrappedAxisTick />} />
+            <PolarRadiusAxis angle={30} domain={[0, 100]} tick={{ fill: "oklch(0.6 0.02 255)", fontSize: 10 }} />
+            <Radar dataKey="A" stroke="oklch(0.78 0.16 180)" fill="oklch(0.78 0.16 180)" fillOpacity={0.35} />
+          </RadarChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+  );
+}
+
+// Custom tick that wraps long category labels onto multiple lines so they
+// never get clipped on tablet/mobile or for any text length.
+function WrappedAxisTick(props: {
+  x?: number; y?: number; payload?: { value: string }; textAnchor?: "end" | "inherit" | "middle" | "start";
+}) {
+  const { x = 0, y = 0, payload, textAnchor = "middle" } = props;
+  const value = payload?.value ?? "";
+  // Split into max-2-word lines so even "Education & Human Capital" wraps cleanly.
+  const words = value.split(" ");
+  const lines: string[] = [];
+  let line: string[] = [];
+  for (const w of words) {
+    line.push(w);
+    if (line.join(" ").length >= 12) { lines.push(line.join(" ")); line = []; }
+  }
+  if (line.length) lines.push(line.join(" "));
+  return (
+    <text x={x} y={y} textAnchor={textAnchor} fill="oklch(0.85 0.02 255)" fontSize={11}>
+      {lines.map((ln, i) => (
+        <tspan key={i} x={x} dy={i === 0 ? 0 : 13}>{ln}</tspan>
+      ))}
+    </text>
+  );
+}
+
+/* ====================================================
+   SECTION 4 — Recommendations
+   ==================================================== */
+function Recommendations({ r }: { r: AssessmentResult }) {
+  // Pick the 3 the spec calls out: Credit Card, the primary loan product, and surface rate band.
+  const card = r.recommendations.find(x => /credit card/i.test(x.product));
+  const loan = r.recommendations.find(x => /personal loan/i.test(x.product))
+    ?? r.recommendations.find(x => /education loan/i.test(x.product))
+    ?? r.recommendations.find(x => x.eligible && !/credit card/i.test(x.product));
+  const featured: LoanRecommendation[] = [card, loan].filter((x): x is LoanRecommendation => !!x);
+  const rateProduct = loan ?? card;
+  return (
+    <div className="mt-8 card-elevated p-6 md:p-8">
+      <div className="flex items-center gap-2">
+        <Wallet className="h-4 w-4 text-primary" />
+        <h2 className="font-display text-lg font-semibold">Recommendations</h2>
+      </div>
+      <p className="text-xs text-muted-foreground">Derived from your score and capacity — not hard-coded.</p>
+      <div className="mt-5 grid gap-4 md:grid-cols-3">
+        {featured.map(rec => <RecCard key={rec.product} rec={rec} />)}
+        <div className="rounded-xl border border-border bg-surface-2/40 p-5">
+          <div className="flex items-center gap-2 text-sm font-semibold"><TrendingUp className="h-4 w-4 text-primary" /> Suggested Interest Band</div>
+          <div className="mt-4 font-display text-3xl font-semibold text-gradient">
+            {rateProduct && rateProduct.interestRange[1] > 0
+              ? `${rateProduct.interestRange[0]}–${rateProduct.interestRange[1]}%`
+              : "—"}
+          </div>
+          <p className="mt-2 text-xs text-muted-foreground">
+            Risk-priced band for unsecured borrowing at this score and confidence.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function RecCard({ rec }: { rec: LoanRecommendation }) {
+  const ineligible = !rec.eligible;
+  const icon = /credit card/i.test(rec.product) ? <CreditCard className="h-4 w-4 text-primary" /> : <Wallet className="h-4 w-4 text-primary" />;
+  return (
+    <div className={`rounded-xl border p-5 ${ineligible ? "border-destructive/40 bg-destructive/5" : "border-border bg-surface-2/40"}`}>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2 font-semibold">{icon}{rec.product}</div>
+        <span className={`inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-widest ${ineligible ? "bg-destructive/15 text-destructive" : "bg-success/15 text-success"}`}>
+          {ineligible ? "Not eligible" : "Eligible"}
+        </span>
+      </div>
+      <div className="mt-4 grid grid-cols-3 gap-3 text-center">
+        <MiniStat label="Approval" value={`${rec.approvalProbability}%`} />
+        <MiniStat label="Amount" value={rec.recommendedAmount > 0 ? `₹${rec.recommendedAmount.toLocaleString("en-IN")}` : "—"} />
+        <MiniStat label="Rate" value={rec.interestRange[1] > 0 ? `${rec.interestRange[0]}–${rec.interestRange[1]}%` : "—"} />
+      </div>
+      <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-surface-2">
+        <div className="h-full rounded-full bg-[image:var(--gradient-brand)]" style={{ width: `${rec.approvalProbability}%` }} />
+      </div>
+      <p className="mt-3 text-xs text-muted-foreground">{rec.rationale}</p>
+    </div>
+  );
+}
+
+function MiniStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <div className="text-[10px] uppercase tracking-widest text-muted-foreground">{label}</div>
+      <div className="mt-1 text-sm font-semibold">{value}</div>
+    </div>
+  );
+}
+
+/* ====================================================
+   SECTION 6 — Verification Summary (compact)
+   ==================================================== */
+function VerificationSummaryCard({ v }: { v: NonNullable<AssessmentResult["verification"]> }) {
+  const tone = verifTone(v.status);
+  const ring =
+    tone === "success" ? "border-success/40 bg-success/5"
+    : tone === "info" ? "border-info/40 bg-info/5"
+    : "border-warning/40 bg-warning/5";
+  const Icon = v.hasBankStatement ? CheckCircle2 : AlertTriangle;
+  return (
+    <div className={`mt-8 rounded-xl border ${ring} p-6`}>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <FileCheck2 className="h-4 w-4 text-primary" />
+          <h2 className="font-display text-lg font-semibold">Verification Summary</h2>
+        </div>
+        <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold
+          ${tone === "success" ? "bg-success/15 text-success" : tone === "info" ? "bg-info/15 text-info" : "bg-warning/15 text-warning"}`}>
+          <Icon className="h-3.5 w-3.5" /> {v.status}
+        </span>
+      </div>
+      <div className="mt-5 grid gap-4 md:grid-cols-4">
+        <VStat label="Income Match" value={v.hasBankStatement ? `${Math.round(v.incomeMatchPct)}%` : "—"} />
+        <VStat label="Verification Score" value={v.hasBankStatement ? `${Math.round(v.verificationScore)}/100` : "—"} />
+        <VStat label="Banking Health" value={v.hasBankStatement ? `${Math.round(v.bankingHealthScore)}/100` : "—"} />
+        <VStat label="Statement Period" value={v.statementPeriod} />
+      </div>
+      {!v.hasBankStatement && (
+        <p className="mt-4 text-xs text-muted-foreground">
+          No bank statement on file. This reduces confidence — never risk. Upload one in the assessment wizard to raise verification.
+        </p>
+      )}
+    </div>
+  );
+}
+
+function VStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">{label}</p>
+      <p className="mt-1 font-display text-base font-semibold">{value}</p>
+    </div>
+  );
+}
+
+/* ====================================================
+   Advanced Analysis accordion — everything else
+   ==================================================== */
+function AdvancedAnalysis({ r, inputs, applicantName }: {
   r: AssessmentResult; inputs: AssessmentInputs; applicantName: string;
 }) {
-  return (
-    <div className="mt-8 space-y-6">
-      <LenderView applicant={applicantName} inputs={inputs} result={r} />
-      <div className="card-elevated p-6">
-        <h2 className="flex items-center gap-2 font-display text-base font-semibold">
-          <FileCheck2 className="h-4 w-4 text-primary" /> Verification
-        </h2>
-        <p className="mt-1 text-xs text-muted-foreground">Optional bank statement upload increases confidence — never risk.</p>
-        <div className="mt-4">
-          <BankStatementAnalyzer
-            declaredIncome={inputs.monthlyIncome ?? 0}
-            baseConfidence={r.confidenceScore}
-          />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ============================================================
-   AI Assessment Summary — merged narrative with tabs
-   ============================================================ */
-function AIAssessmentSummary({ inputs, result }: { inputs: AssessmentInputs; result: AssessmentResult }) {
-  return (
-    <div className="card-elevated p-6">
-      <div className="flex items-center gap-2">
-        <Sparkles className="h-4 w-4 text-primary" />
-        <h2 className="font-display text-lg font-semibold">AI Assessment Summary</h2>
-      </div>
-      <p className="mt-1 text-xs text-muted-foreground">
-        Summary, strengths, risks, missing information, and recommended actions — generated from your assessment.
-      </p>
-      <div className="mt-5">
-        <AIInsights inputs={inputs} result={result} />
-      </div>
-    </div>
-  );
-}
-
-/* ============================================================
-   Improvement Simulator panel — hidden behind a button
-   ============================================================ */
-function SimulatorPanel({ inputs, baseline }: { inputs: AssessmentInputs; baseline: AssessmentResult }) {
-  const [open, setOpen] = useState(false);
-  if (!open) {
-    return (
-      <div className="card-elevated flex flex-col items-start gap-3 p-6 md:flex-row md:items-center md:justify-between">
-        <div>
-          <h3 className="font-display text-base font-semibold">Improvement Simulator</h3>
-          <p className="text-xs text-muted-foreground">See how changes to income, savings, or behaviour move your score.</p>
-        </div>
-        <Button onClick={() => setOpen(true)}><PlayCircle className="mr-1.5 h-4 w-4" /> Run Improvement Simulation</Button>
-      </div>
-    );
-  }
-  return <WhatIfSimulator inputs={inputs} baseline={baseline} />;
-}
-
-/* ============================================================
-   Collapsible section wrapper
-   ============================================================ */
-function Section({ title, subtitle, children }: { title: string; subtitle?: string; children: React.ReactNode }) {
   const [open, setOpen] = useState(false);
   return (
-    <Collapsible open={open} onOpenChange={setOpen}>
+    <Collapsible open={open} onOpenChange={setOpen} className="mt-8">
       <CollapsibleTrigger className="flex w-full items-center justify-between rounded-xl border border-border bg-surface-2/40 px-5 py-4 text-left transition hover:bg-surface-2/70">
-        <div>
-          <h3 className="font-display text-base font-semibold">{title}</h3>
-          {subtitle && <p className="text-xs text-muted-foreground">{subtitle}</p>}
+        <div className="flex items-center gap-2">
+          <Sparkles className="h-4 w-4 text-primary" />
+          <div>
+            <h3 className="font-display text-base font-semibold">Advanced Analysis</h3>
+            <p className="text-xs text-muted-foreground">Explainable AI, confidence breakdown, what-if simulator, lender view, advanced scores.</p>
+          </div>
         </div>
         <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`} />
       </CollapsibleTrigger>
-      <CollapsibleContent className="mt-3">
-        {children}
+      <CollapsibleContent className="mt-4 space-y-6">
+        <AdvancedScores r={r} />
+        <ExplainableAI r={r} />
+        <ConfidenceAnalysis inputs={inputs} result={r} />
+        <WhatIfSimulator inputs={inputs} baseline={r} />
+        <LenderView applicant={applicantName} inputs={inputs} result={r} />
+        {/* Re-upload / inspect bank statement here as well */}
+        <div className="card-elevated p-6">
+          <h3 className="flex items-center gap-2 font-display text-base font-semibold">
+            <ShieldCheck className="h-4 w-4 text-primary" /> Re-verify bank statement
+          </h3>
+          <p className="mt-1 text-xs text-muted-foreground">
+            You can upload a different statement here to re-check verification. Score is computed from the assessment inputs; uploads here are exploratory.
+          </p>
+          <div className="mt-4">
+            <BankStatementAnalyzer
+              declaredIncome={inputs.monthlyIncome ?? 0}
+              baseConfidence={r.confidenceScore}
+              initialAnalysis={inputs.bankAnalysis ?? null}
+            />
+          </div>
+        </div>
       </CollapsibleContent>
     </Collapsible>
   );
 }
 
-/* ============================================================
-   Small primitives
-   ============================================================ */
+/* ====================================================
+   Helpers
+   ==================================================== */
 function riskTone(level: string): "success" | "info" | "warning" | "destructive" {
   if (level === "Low") return "success";
   if (level === "Moderate") return "info";
@@ -345,6 +407,11 @@ function eligTone(s: string): "success" | "info" | "warning" | "destructive" {
   if (s === "Conditional Approval") return "info";
   if (s === "Manual Review") return "warning";
   return "destructive";
+}
+function verifTone(s: VerificationStatus): "success" | "info" | "warning" {
+  if (s === "Verified") return "success";
+  if (s === "Partially Verified") return "info";
+  return "warning";
 }
 
 function ScoreDial({ score }: { score: number }) {
@@ -368,59 +435,6 @@ function ScoreDial({ score }: { score: number }) {
         <div className="font-display text-6xl font-bold text-gradient">{Math.round(score)}</div>
         <div className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">Overall</div>
       </div>
-    </div>
-  );
-}
-
-function Meter({ title, value, suffix, subtitle, icon, tone }: {
-  title: string; value: number; suffix: string; subtitle: string; icon: React.ReactNode; tone: "risk" | "confidence";
-}) {
-  const pct = Math.max(0, Math.min(100, value));
-  const fill = tone === "risk"
-    ? "linear-gradient(90deg, oklch(0.74 0.17 152), oklch(0.80 0.16 80), oklch(0.65 0.23 25))"
-    : "var(--gradient-brand)";
-  return (
-    <div className="card-elevated p-5">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2 text-sm font-medium">{icon}{title}</div>
-        <div className="font-semibold">{Math.round(value)}<span className="ml-1 text-xs text-muted-foreground">{suffix}</span></div>
-      </div>
-      <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-surface-2">
-        <div className="h-full rounded-full" style={{ width: `${pct}%`, background: fill }} />
-      </div>
-      <p className="mt-2 text-xs text-muted-foreground">{subtitle}</p>
-    </div>
-  );
-}
-
-function RecCard({ rec }: { rec: LoanRecommendation }) {
-  const ineligible = !rec.eligible;
-  return (
-    <div className={`rounded-xl border p-5 ${ineligible ? "border-destructive/40 bg-destructive/5" : "border-border bg-surface-2/40"}`}>
-      <div className="flex items-center justify-between">
-        <h3 className="font-semibold">{rec.product}</h3>
-        <span className={`inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-widest ${ineligible ? "bg-destructive/15 text-destructive" : "bg-success/15 text-success"}`}>
-          {ineligible ? "Not eligible" : "Eligible"}
-        </span>
-      </div>
-      <div className="mt-4 grid grid-cols-3 gap-3 text-center">
-        <MiniStat label="Approval" value={`${rec.approvalProbability}%`} />
-        <MiniStat label="Amount" value={rec.recommendedAmount > 0 ? `₹${(rec.recommendedAmount).toLocaleString("en-IN")}` : "—"} />
-        <MiniStat label="Rate" value={rec.interestRange[1] > 0 ? `${rec.interestRange[0]}–${rec.interestRange[1]}%` : "—"} />
-      </div>
-      <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-surface-2">
-        <div className="h-full rounded-full bg-[image:var(--gradient-brand)]" style={{ width: `${rec.approvalProbability}%` }} />
-      </div>
-      <p className="mt-3 text-xs text-muted-foreground">{rec.rationale}</p>
-    </div>
-  );
-}
-
-function MiniStat({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <div className="text-[10px] uppercase tracking-widest text-muted-foreground">{label}</div>
-      <div className="mt-1 text-sm font-semibold">{value}</div>
     </div>
   );
 }
