@@ -10,6 +10,8 @@ import { ArrowLeft, ArrowRight, Check, Loader2 } from "lucide-react";
 import { computeAssessment, EMPTY_INPUTS, type AssessmentInputs } from "@/lib/scoring";
 import { supabase } from "@/integrations/supabase/client";
 import { NumberField } from "@/components/NumberField";
+import { BankStatementAnalyzer } from "@/components/report/BankStatementAnalyzer";
+import type { BankAnalysis } from "@/lib/bank-statement";
 
 export const Route = createFileRoute("/_authenticated/assessment")({
   head: () => ({ meta: [{ title: "New assessment — Credit Vision" }] }),
@@ -22,7 +24,8 @@ const STEPS = [
   { id: 3, title: "Banking", desc: "Bank behaviour & flow" },
   { id: 4, title: "Bills", desc: "Payment regularity" },
   { id: 5, title: "Employment", desc: "Job quality & growth" },
-  { id: 6, title: "Review", desc: "Confirm & score" },
+  { id: 6, title: "Verification", desc: "Optional bank statement upload" },
+  { id: 7, title: "Review", desc: "Confirm & score" },
 ];
 
 function ScaleField({ label, value, onChange, low = "Low", high = "High" }: {
