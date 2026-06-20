@@ -67,6 +67,9 @@ export interface AssessmentInputs {
   salaryGrowthPct: number;
   promotions: number;
   employerStability: 1 | 2 | 3 | 4 | 5;
+
+  // Step 6 — Bank Verification (optional)
+  bankAnalysis?: BankAnalysis | null;
 }
 
 export interface CategoryBreakdown {
