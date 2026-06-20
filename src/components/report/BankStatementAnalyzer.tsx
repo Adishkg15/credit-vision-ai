@@ -53,7 +53,7 @@ export function BankStatementAnalyzer({ declaredIncome, baseConfidence = 0, init
           </p>
         </div>
         {analysis && (
-          <Button variant="ghost" size="sm" onClick={() => setAnalysis(null)}>
+          <Button variant="ghost" size="sm" onClick={clear}>
             <X className="mr-1 h-4 w-4" /> Clear
           </Button>
         )}
