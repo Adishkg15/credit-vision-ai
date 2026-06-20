@@ -100,6 +100,20 @@ export interface AdvancedScores {
   trustBreakdown: { label: string; contribution: number }[];
 }
 
+export type VerificationStatus = "Verified" | "Partially Verified" | "Self Reported";
+
+export interface VerificationSummary {
+  status: VerificationStatus;
+  verificationScore: number;       // 0..100
+  bankingHealthScore: number;      // 0..100
+  incomeMatchPct: number;          // 0..100 (100 = no match data)
+  declaredIncome: number;
+  verifiedIncome: number;
+  statementPeriod: string;         // "Jan 24 → Jun 24" or "Not provided"
+  hasBankStatement: boolean;
+  incomeMismatchFlag: boolean;     // declared vs verified differ >20%
+}
+
 export interface AssessmentResult {
   overallScore: number;
   confidenceScore: number;
@@ -112,6 +126,7 @@ export interface AssessmentResult {
   insights: string[];
   recommendations: LoanRecommendation[];
   advanced: AdvancedScores;
+  verification: VerificationSummary;
 }
 
 const clamp = (n: number, lo = 0, hi = 100) => Math.max(lo, Math.min(hi, n));
