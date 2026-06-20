@@ -9,11 +9,14 @@ import { analyzeFile, type BankAnalysis } from "@/lib/bank-statement";
 
 interface Props {
   declaredIncome: number;
-  baseConfidence: number;
+  baseConfidence?: number;
+  initialAnalysis?: BankAnalysis | null;
+  onAnalysis?: (a: BankAnalysis | null) => void;
+  compact?: boolean;
 }
 
-export function BankStatementAnalyzer({ declaredIncome, baseConfidence }: Props) {
-  const [analysis, setAnalysis] = useState<BankAnalysis | null>(null);
+export function BankStatementAnalyzer({ declaredIncome, baseConfidence = 0, initialAnalysis = null, onAnalysis, compact = false }: Props) {
+  const [analysis, setAnalysis] = useState<BankAnalysis | null>(initialAnalysis);
   const [busy, setBusy] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -22,6 +25,7 @@ export function BankStatementAnalyzer({ declaredIncome, baseConfidence }: Props)
     try {
       const a = await analyzeFile(file, declaredIncome);
       setAnalysis(a);
+      onAnalysis?.(a);
       toast.success(`Statement analysed: ${a.txnCount} transactions, ${a.monthsCovered} months`);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Failed to analyse file");
@@ -29,6 +33,11 @@ export function BankStatementAnalyzer({ declaredIncome, baseConfidence }: Props)
       setBusy(false);
       if (inputRef.current) inputRef.current.value = "";
     }
+  }
+
+  function clear() {
+    setAnalysis(null);
+    onAnalysis?.(null);
   }
 
   return (
