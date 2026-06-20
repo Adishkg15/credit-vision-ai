@@ -503,6 +503,7 @@ export function computeAssessment(i: AssessmentInputs): AssessmentResult {
     insights: insights.slice(0, 6),
     recommendations,
     advanced,
+    verification,
   };
 }
 
