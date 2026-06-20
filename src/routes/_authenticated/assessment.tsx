@@ -310,6 +310,24 @@ function Wizard() {
         )}
 
         {step === 6 && (
+          <div className="space-y-4">
+            <div className="rounded-lg border border-info/30 bg-info/10 p-4 text-sm text-info">
+              <p className="font-semibold">Optional — but recommended.</p>
+              <p className="mt-1 text-xs">
+                Upload a recent bank statement (PDF or CSV) to <b>verify</b> your declared income
+                and banking behaviour. This <b>improves confidence and verification</b>. Missing it
+                does <b>not</b> increase risk — it only lowers confidence.
+              </p>
+            </div>
+            <BankStatementAnalyzer
+              declaredIncome={data.monthlyIncome}
+              initialAnalysis={data.bankAnalysis ?? null}
+              onAnalysis={(a) => set("bankAnalysis", a)}
+            />
+          </div>
+        )}
+
+        {step === 7 && (
           <ReviewStep data={data} />
         )}
 
