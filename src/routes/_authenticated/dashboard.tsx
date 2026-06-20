@@ -24,7 +24,7 @@ const listOpts = queryOptions({
 });
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
-  head: () => ({ meta: [{ title: "Dashboard — CreditVision AI" }] }),
+  head: () => ({ meta: [{ title: "Dashboard — Credit Vision" }] }),
   loader: ({ context }) => context.queryClient.ensureQueryData(listOpts),
   component: Dashboard,
   errorComponent: ({ error }) => <div className="p-8 text-destructive">{error.message}</div>,

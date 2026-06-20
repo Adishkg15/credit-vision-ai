@@ -40,7 +40,7 @@ const opts = (id: string) => queryOptions({
 });
 
 export const Route = createFileRoute("/_authenticated/report/$id")({
-  head: () => ({ meta: [{ title: "Report — CreditVision AI" }] }),
+  head: () => ({ meta: [{ title: "Report — Credit Vision" }] }),
   loader: ({ context, params }) => context.queryClient.ensureQueryData(opts(params.id)),
   component: ReportPage,
   errorComponent: ({ error }) => <div className="p-8 text-destructive">{error.message}</div>,

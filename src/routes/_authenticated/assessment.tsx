@@ -12,7 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { NumberField } from "@/components/NumberField";
 
 export const Route = createFileRoute("/_authenticated/assessment")({
-  head: () => ({ meta: [{ title: "New assessment — CreditVision AI" }] }),
+  head: () => ({ meta: [{ title: "New assessment — Credit Vision" }] }),
   component: Wizard,
 });
 

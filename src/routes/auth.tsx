@@ -13,7 +13,7 @@ export const Route = createFileRoute("/auth")({
   validateSearch: (s: Record<string, unknown>): AuthSearch => ({
     mode: s.mode === "signup" ? "signup" : s.mode === "signin" ? "signin" : undefined,
   }),
-  head: () => ({ meta: [{ title: "Sign in — CreditVision AI" }] }),
+  head: () => ({ meta: [{ title: "Sign in — Credit Vision" }] }),
   beforeLoad: async () => {
     if (typeof window === "undefined") return;
     const { data } = await supabase.auth.getSession();
@@ -73,7 +73,7 @@ function AuthPage() {
           <div className="grid h-9 w-9 place-items-center rounded-lg bg-[image:var(--gradient-brand)] btn-glow">
             <Sparkles className="h-4 w-4 text-primary-foreground" />
           </div>
-          <span className="font-display text-lg font-semibold">CreditVision AI</span>
+          <span className="font-display text-lg font-semibold">Credit Vision</span>
         </Link>
 
         <div className="card-elevated p-8">
@@ -81,7 +81,7 @@ function AuthPage() {
             {tab === "signin" ? "Sign in" : "Create your account"}
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            {tab === "signin" ? "Welcome back to CreditVision." : "Start your first assessment in seconds."}
+            {tab === "signin" ? "Welcome back to Credit Vision." : "Start your first assessment in seconds."}
           </p>
 
           <div className="mt-6 flex rounded-lg bg-surface-2 p-1 text-sm">
