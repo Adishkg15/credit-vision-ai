@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "CreditVision AI — Credit for the credit-invisible" },
+      { title: "Credit Vision — Credit for the credit-invisible" },
       { name: "description", content: "Alternative credit assessment built for students, freelancers, gig workers and first-time borrowers. Missing history isn't risk." },
     ],
   }),
@@ -20,7 +20,7 @@ function Landing() {
           <div className="grid h-9 w-9 place-items-center rounded-lg bg-[image:var(--gradient-brand)] btn-glow">
             <Sparkles className="h-4 w-4 text-primary-foreground" />
           </div>
-          <span className="font-display text-lg font-semibold tracking-tight">CreditVision AI</span>
+          <span className="font-display text-lg font-semibold tracking-tight">Credit Vision</span>
         </Link>
         <nav className="flex items-center gap-3">
           <Link to="/auth"><Button variant="ghost" size="sm">Sign in</Button></Link>
@@ -83,7 +83,7 @@ function Landing() {
 
       <footer className="border-t border-border/60">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-6 text-xs text-muted-foreground">
-          <span>© {new Date().getFullYear()} CreditVision AI</span>
+          <span>© {new Date().getFullYear()} Credit Vision</span>
           <span>Built for credit-invisible consumers</span>
         </div>
       </footer>

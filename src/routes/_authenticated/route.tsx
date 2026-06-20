@@ -40,7 +40,7 @@ function AppLayout() {
           <div className="grid h-9 w-9 place-items-center rounded-lg bg-[image:var(--gradient-brand)] btn-glow">
             <Sparkles className="h-4 w-4 text-primary-foreground" />
           </div>
-          <span className="font-display text-base font-semibold">CreditVision</span>
+          <span className="font-display text-base font-semibold">Credit Vision</span>
         </div>
         <nav className="flex-1 space-y-1 px-3">
           {nav.map(n => {
@@ -70,7 +70,7 @@ function AppLayout() {
         <header className="flex items-center justify-between border-b border-border px-4 py-3 md:hidden">
           <Link to="/dashboard" className="flex items-center gap-2">
             <div className="grid h-8 w-8 place-items-center rounded-md bg-[image:var(--gradient-brand)]"><Sparkles className="h-3.5 w-3.5 text-primary-foreground" /></div>
-            <span className="font-display text-sm font-semibold">CreditVision</span>
+            <span className="font-display text-sm font-semibold">Credit Vision</span>
           </Link>
           <Button size="sm" variant="ghost" onClick={signOut}><LogOut className="h-4 w-4" /></Button>
         </header>

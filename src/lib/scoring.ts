@@ -1,4 +1,4 @@
-// Pure scoring engine for CreditVision AI.
+// Pure scoring engine for Credit Vision.
 // Philosophy: missing credit history = missing information, NOT risk.
 // Risk score and Confidence score are independent.
 

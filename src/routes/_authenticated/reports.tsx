@@ -21,7 +21,7 @@ const opts = queryOptions({
 });
 
 export const Route = createFileRoute("/_authenticated/reports")({
-  head: () => ({ meta: [{ title: "Reports — CreditVision AI" }] }),
+  head: () => ({ meta: [{ title: "Reports — Credit Vision" }] }),
   loader: ({ context }) => context.queryClient.ensureQueryData(opts),
   component: ReportsList,
   errorComponent: ({ error }) => <div className="p-8 text-destructive">{error.message}</div>,
@@ -32,7 +32,7 @@ function ReportsList() {
   return (
     <div className="mx-auto max-w-7xl px-6 py-10">
       <h1 className="font-display text-3xl font-semibold">Reports</h1>
-      <p className="mt-1 text-sm text-muted-foreground">All your CreditVision assessments.</p>
+      <p className="mt-1 text-sm text-muted-foreground">All your Credit Vision assessments.</p>
 
       <div className="mt-6 card-elevated overflow-hidden">
         {rows.length === 0 ? (

@@ -50,7 +50,7 @@ export const generateAIInsights = createServerFn({ method: "POST" })
     };
 
     const system =
-      "You are an alternative credit analyst for CreditVision AI. " +
+      "You are an alternative credit analyst for Credit Vision. " +
       "You NEVER calculate or change scores. The scores you receive are final, from a deterministic rule engine. " +
       "Your job is to explain the result in clear human language. " +
       "Core philosophy: missing credit history is treated as MISSING INFORMATION, never as risk. " +
