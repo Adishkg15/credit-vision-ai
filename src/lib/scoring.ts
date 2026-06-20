@@ -2,6 +2,8 @@
 // Philosophy: missing credit history = missing information, NOT risk.
 // Risk score and Confidence score are independent.
 
+import type { BankAnalysis } from "./bank-statement";
+
 export type EmploymentType =
   | "student"
   | "fresher"
