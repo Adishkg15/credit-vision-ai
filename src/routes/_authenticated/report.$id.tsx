@@ -210,7 +210,7 @@ function ScoreBreakdownRadar({ r }: { r: AssessmentResult }) {
 // Custom tick that wraps long category labels onto multiple lines so they
 // never get clipped on tablet/mobile or for any text length.
 function WrappedAxisTick(props: {
-  x?: number; y?: number; payload?: { value: string }; textAnchor?: string;
+  x?: number; y?: number; payload?: { value: string }; textAnchor?: "end" | "inherit" | "middle" | "start";
 }) {
   const { x = 0, y = 0, payload, textAnchor = "middle" } = props;
   const value = payload?.value ?? "";
