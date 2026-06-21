@@ -6,19 +6,15 @@ import {
   Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer,
 } from "recharts";
 import {
-  ArrowLeft, ShieldCheck, Download, ChevronDown, FileCheck2, AlertTriangle,
-  CheckCircle2, Sparkles, Wallet, CreditCard, TrendingUp,
+  ArrowLeft, Download, FileCheck2, AlertTriangle, CheckCircle2,
+  Wallet, CreditCard, TrendingUp, Eye,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useState } from "react";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { ExplainableAI } from "@/components/report/ExplainableAI";
-import { ConfidenceAnalysis } from "@/components/report/ConfidenceAnalysis";
-import { WhatIfSimulator } from "@/components/report/WhatIfSimulator";
-import { LenderView } from "@/components/report/LenderView";
-import { AdvancedScores } from "@/components/report/AdvancedScores";
 import { AIInsights } from "@/components/report/AIInsights";
 import { BankStatementAnalyzer } from "@/components/report/BankStatementAnalyzer";
+import { LenderView } from "@/components/report/LenderView";
 import { downloadPdfReport } from "@/lib/pdf-report";
 
 type AssessmentRow = {
@@ -53,9 +49,9 @@ function ReportPage() {
   const { data } = useSuspenseQuery(opts(id));
   const r = data.result;
   const applicantName = data.applicant_name || data.inputs.name || "Applicant";
+  const [lenderMode, setLenderMode] = useState(false);
   const handlePdf = () => downloadPdfReport({ applicantName, inputs: data.inputs, result: r });
 
-  // Defensive: older assessments may not have `verification`.
   const verification = r.verification ?? {
     status: "Self Reported" as VerificationStatus,
     verificationScore: 0, bankingHealthScore: 0, incomeMatchPct: 0,
@@ -65,15 +61,29 @@ function ReportPage() {
 
   return (
     <div className="mx-auto max-w-6xl px-6 py-10">
+      {/* Top bar */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Link to="/dashboard"><Button variant="ghost" size="sm"><ArrowLeft className="mr-1 h-4 w-4" /> Dashboard</Button></Link>
-        <Button size="sm" onClick={handlePdf}><Download className="mr-1 h-4 w-4" /> Export PDF</Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant={lenderMode ? "default" : "outline"}
+            size="sm"
+            onClick={() => setLenderMode(v => !v)}
+          >
+            <Eye className="mr-1 h-4 w-4" /> {lenderMode ? "Applicant View" : "Lender View"}
+          </Button>
+          <Button size="sm" onClick={handlePdf}><Download className="mr-1 h-4 w-4" /> Export PDF</Button>
+        </div>
       </div>
 
-      {/* SECTION 1 — Executive Summary */}
-      <ExecutiveSummary applicantName={applicantName} r={r} verificationStatus={verification.status} createdAt={data.created_at} />
+      {/* Hero — always visible */}
+      <ExecutiveSummary
+        applicantName={applicantName}
+        r={r}
+        verificationStatus={verification.status}
+        createdAt={data.created_at}
+      />
 
-      {/* Mismatch warning */}
       {verification.incomeMismatchFlag && (
         <div className="mt-4 flex items-start gap-3 rounded-xl border border-warning/40 bg-warning/10 p-4 text-sm text-warning">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
@@ -87,25 +97,52 @@ function ReportPage() {
         </div>
       )}
 
-      {/* SECTION 2 — Key Metrics */}
-      <KeyMetrics r={r} />
+      {lenderMode ? (
+        <div className="mt-8 space-y-6">
+          <LenderView applicant={applicantName} inputs={data.inputs} result={r} />
+          <Recommendations r={r} />
+          <VerificationSummaryCard v={verification} compact />
+        </div>
+      ) : (
+        <Tabs defaultValue="overview" className="mt-8">
+          <TabsList className="h-10 w-full justify-start gap-1 rounded-xl bg-surface-2/60 p-1">
+            <TabsTrigger value="overview" className="px-4">Overview</TabsTrigger>
+            <TabsTrigger value="recommendations" className="px-4">Recommendations</TabsTrigger>
+            <TabsTrigger value="ai" className="px-4">AI Insights</TabsTrigger>
+            <TabsTrigger value="verification" className="px-4">Verification</TabsTrigger>
+          </TabsList>
 
-      {/* SECTION 3 — Radar */}
-      <ScoreBreakdownRadar r={r} />
+          <TabsContent value="overview" className="mt-6 space-y-6">
+            <KeyMetrics r={r} />
+            <ScoreBreakdownRadar r={r} />
+          </TabsContent>
 
-      {/* SECTION 4 — Recommendations */}
-      <Recommendations r={r} />
+          <TabsContent value="recommendations" className="mt-6">
+            <Recommendations r={r} />
+          </TabsContent>
 
-      {/* SECTION 5 — AI Insights */}
-      <div className="mt-8">
-        <AIInsights inputs={data.inputs} result={r} />
-      </div>
+          <TabsContent value="ai" className="mt-6">
+            <AIInsights inputs={data.inputs} result={r} />
+          </TabsContent>
 
-      {/* SECTION 6 — Verification Summary */}
-      <VerificationSummaryCard v={verification} />
-
-      {/* Advanced Analysis accordion */}
-      <AdvancedAnalysis r={r} inputs={data.inputs} applicantName={applicantName} />
+          <TabsContent value="verification" className="mt-6 space-y-6">
+            <VerificationSummaryCard v={verification} />
+            <div className="card-elevated p-6">
+              <h3 className="font-display text-base font-semibold">Statement upload</h3>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Upload or re-upload a bank statement to refresh verification signals.
+              </p>
+              <div className="mt-4">
+                <BankStatementAnalyzer
+                  declaredIncome={data.inputs.monthlyIncome ?? 0}
+                  baseConfidence={r.confidenceScore}
+                  initialAnalysis={data.inputs.bankAnalysis ?? null}
+                />
+              </div>
+            </div>
+          </TabsContent>
+        </Tabs>
+      )}
 
       <p className="mt-10 text-center text-xs text-muted-foreground">
         Generated from inputs you provided. Risk and confidence are independent. Missing data lowers confidence, never risk.
@@ -115,7 +152,7 @@ function ReportPage() {
 }
 
 /* ====================================================
-   SECTION 1 — Executive Summary
+   Executive Summary
    ==================================================== */
 function ExecutiveSummary({ applicantName, r, verificationStatus, createdAt }: {
   applicantName: string; r: AssessmentResult; verificationStatus: VerificationStatus; createdAt: string;
@@ -160,7 +197,7 @@ function Stat({ label, value, tone }: { label: string; value: string; tone?: "su
 }
 
 /* ====================================================
-   SECTION 2 — Key Metrics (4 cards only)
+   Key Metrics
    ==================================================== */
 function KeyMetrics({ r }: { r: AssessmentResult }) {
   const wanted = ["financial", "banking", "employment", "bills"];
@@ -168,7 +205,7 @@ function KeyMetrics({ r }: { r: AssessmentResult }) {
     .map(k => r.categories.find(c => c.key === k))
     .filter((c): c is NonNullable<typeof c> => !!c);
   return (
-    <div className="mt-8 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
       {cats.map(c => (
         <div key={c.key} className="card-elevated p-5">
           <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">{c.label}</p>
@@ -184,18 +221,17 @@ function KeyMetrics({ r }: { r: AssessmentResult }) {
 }
 
 /* ====================================================
-   SECTION 3 — Radar Chart with wrapped labels
+   Radar
    ==================================================== */
 function ScoreBreakdownRadar({ r }: { r: AssessmentResult }) {
   const radarData = r.categories.map(c => ({ subject: c.label, A: c.score, fullMark: 100 }));
   return (
-    <div className="mt-8 card-elevated p-6 md:p-8">
+    <div className="card-elevated p-6 md:p-8">
       <h2 className="font-display text-lg font-semibold">Score breakdown</h2>
       <p className="text-xs text-muted-foreground">Six-factor view of your credit profile.</p>
-      {/* Generous height and outerRadius gives wrapped labels room on all screens */}
-      <div className="mt-6 h-[420px] w-full px-2 md:h-[480px] md:px-8">
+      <div className="mt-4 h-[380px] w-full md:h-[420px]">
         <ResponsiveContainer>
-          <RadarChart data={radarData} margin={{ top: 30, right: 70, bottom: 30, left: 70 }} outerRadius="72%">
+          <RadarChart data={radarData} margin={{ top: 24, right: 60, bottom: 24, left: 60 }} outerRadius="78%">
             <PolarGrid stroke="oklch(0.35 0.02 260)" />
             <PolarAngleAxis dataKey="subject" tick={<WrappedAxisTick />} />
             <PolarRadiusAxis angle={30} domain={[0, 100]} tick={{ fill: "oklch(0.6 0.02 255)", fontSize: 10 }} />
@@ -207,14 +243,11 @@ function ScoreBreakdownRadar({ r }: { r: AssessmentResult }) {
   );
 }
 
-// Custom tick that wraps long category labels onto multiple lines so they
-// never get clipped on tablet/mobile or for any text length.
 function WrappedAxisTick(props: {
   x?: number; y?: number; payload?: { value: string }; textAnchor?: "end" | "inherit" | "middle" | "start";
 }) {
   const { x = 0, y = 0, payload, textAnchor = "middle" } = props;
   const value = payload?.value ?? "";
-  // Split into max-2-word lines so even "Education & Human Capital" wraps cleanly.
   const words = value.split(" ");
   const lines: string[] = [];
   let line: string[] = [];
@@ -233,10 +266,9 @@ function WrappedAxisTick(props: {
 }
 
 /* ====================================================
-   SECTION 4 — Recommendations
+   Recommendations
    ==================================================== */
 function Recommendations({ r }: { r: AssessmentResult }) {
-  // Pick the 3 the spec calls out: Credit Card, the primary loan product, and surface rate band.
   const card = r.recommendations.find(x => /credit card/i.test(x.product));
   const loan = r.recommendations.find(x => /personal loan/i.test(x.product))
     ?? r.recommendations.find(x => /education loan/i.test(x.product))
@@ -244,12 +276,12 @@ function Recommendations({ r }: { r: AssessmentResult }) {
   const featured: LoanRecommendation[] = [card, loan].filter((x): x is LoanRecommendation => !!x);
   const rateProduct = loan ?? card;
   return (
-    <div className="mt-8 card-elevated p-6 md:p-8">
+    <div className="card-elevated p-6 md:p-8">
       <div className="flex items-center gap-2">
         <Wallet className="h-4 w-4 text-primary" />
         <h2 className="font-display text-lg font-semibold">Recommendations</h2>
       </div>
-      <p className="text-xs text-muted-foreground">Derived from your score and capacity — not hard-coded.</p>
+      <p className="text-xs text-muted-foreground">Derived from your score and capacity.</p>
       <div className="mt-5 grid gap-4 md:grid-cols-3">
         {featured.map(rec => <RecCard key={rec.product} rec={rec} />)}
         <div className="rounded-xl border border-border bg-surface-2/40 p-5">
@@ -302,9 +334,9 @@ function MiniStat({ label, value }: { label: string; value: string }) {
 }
 
 /* ====================================================
-   SECTION 6 — Verification Summary (compact)
+   Verification
    ==================================================== */
-function VerificationSummaryCard({ v }: { v: NonNullable<AssessmentResult["verification"]> }) {
+function VerificationSummaryCard({ v, compact = false }: { v: NonNullable<AssessmentResult["verification"]>; compact?: boolean }) {
   const tone = verifTone(v.status);
   const ring =
     tone === "success" ? "border-success/40 bg-success/5"
@@ -312,7 +344,7 @@ function VerificationSummaryCard({ v }: { v: NonNullable<AssessmentResult["verif
     : "border-warning/40 bg-warning/5";
   const Icon = v.hasBankStatement ? CheckCircle2 : AlertTriangle;
   return (
-    <div className={`mt-8 rounded-xl border ${ring} p-6`}>
+    <div className={`rounded-xl border ${ring} p-6`}>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <FileCheck2 className="h-4 w-4 text-primary" />
@@ -329,9 +361,9 @@ function VerificationSummaryCard({ v }: { v: NonNullable<AssessmentResult["verif
         <VStat label="Banking Health" value={v.hasBankStatement ? `${Math.round(v.bankingHealthScore)}/100` : "—"} />
         <VStat label="Statement Period" value={v.statementPeriod} />
       </div>
-      {!v.hasBankStatement && (
+      {!compact && !v.hasBankStatement && (
         <p className="mt-4 text-xs text-muted-foreground">
-          No bank statement on file. This reduces confidence — never risk. Upload one in the assessment wizard to raise verification.
+          No bank statement on file. This reduces confidence — never risk. Upload one below to raise verification.
         </p>
       )}
     </div>
@@ -344,52 +376,6 @@ function VStat({ label, value }: { label: string; value: string }) {
       <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">{label}</p>
       <p className="mt-1 font-display text-base font-semibold">{value}</p>
     </div>
-  );
-}
-
-/* ====================================================
-   Advanced Analysis accordion — everything else
-   ==================================================== */
-function AdvancedAnalysis({ r, inputs, applicantName }: {
-  r: AssessmentResult; inputs: AssessmentInputs; applicantName: string;
-}) {
-  const [open, setOpen] = useState(false);
-  return (
-    <Collapsible open={open} onOpenChange={setOpen} className="mt-8">
-      <CollapsibleTrigger className="flex w-full items-center justify-between rounded-xl border border-border bg-surface-2/40 px-5 py-4 text-left transition hover:bg-surface-2/70">
-        <div className="flex items-center gap-2">
-          <Sparkles className="h-4 w-4 text-primary" />
-          <div>
-            <h3 className="font-display text-base font-semibold">Advanced Analysis</h3>
-            <p className="text-xs text-muted-foreground">Explainable AI, confidence breakdown, what-if simulator, lender view, advanced scores.</p>
-          </div>
-        </div>
-        <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`} />
-      </CollapsibleTrigger>
-      <CollapsibleContent className="mt-4 space-y-6">
-        <AdvancedScores r={r} />
-        <ExplainableAI r={r} />
-        <ConfidenceAnalysis inputs={inputs} result={r} />
-        <WhatIfSimulator inputs={inputs} baseline={r} />
-        <LenderView applicant={applicantName} inputs={inputs} result={r} />
-        {/* Re-upload / inspect bank statement here as well */}
-        <div className="card-elevated p-6">
-          <h3 className="flex items-center gap-2 font-display text-base font-semibold">
-            <ShieldCheck className="h-4 w-4 text-primary" /> Re-verify bank statement
-          </h3>
-          <p className="mt-1 text-xs text-muted-foreground">
-            You can upload a different statement here to re-check verification. Score is computed from the assessment inputs; uploads here are exploratory.
-          </p>
-          <div className="mt-4">
-            <BankStatementAnalyzer
-              declaredIncome={inputs.monthlyIncome ?? 0}
-              baseConfidence={r.confidenceScore}
-              initialAnalysis={inputs.bankAnalysis ?? null}
-            />
-          </div>
-        </div>
-      </CollapsibleContent>
-    </Collapsible>
   );
 }
 
